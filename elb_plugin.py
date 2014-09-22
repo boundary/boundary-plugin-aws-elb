@@ -54,7 +54,10 @@ if __name__ == '__main__':
         for k,v in flat_data.items():
             # Do not report duplicate samples, since Boundary sums them up
             # instead of ignoring them.
-            if reported_metrics.get(k, None) == v:
+            # TEMPORARY WORKAROUND: Always report the HealthyHostCount metric, because
+            # if we report nothing the relay thinks we're dead.  That specific metric
+            # doesn't hurt to report multiple times, because it's averaged out anyway.
+            if reported_metrics.get(k, None) == v and k[1] != 'HealthyHostCount':
                 continue
 
             lb_name, metric_name = k
