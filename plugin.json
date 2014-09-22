@@ -1,0 +1,38 @@
+{
+    "description": "Monitors AWS Elastic Load Balancers",
+    "command": "python elb_plugin.py",
+    "metrics" : [
+		 "AWS_ELB_HealthyHostCount",
+		 "AWS_ELB_UnHealthyHostCount",
+		 "AWS_ELB_RequestCount",
+		 "AWS_ELB_Latency",
+		 "AWS_ELB_HTTPCode_ELB_4XX",
+		 "AWS_ELB_HTTPCode_ELB_5XX",
+		 "AWS_ELB_HTTPCode_Backend_2XX",
+		 "AWS_ELB_HTTPCode_Backend_3XX",
+		 "AWS_ELB_HTTPCode_Backend_4XX",
+		 "AWS_ELB_HTTPCode_Backend_5XX",
+		 "AWS_ELB_BackendConnectionErrors",
+		 "AWS_ELB_SurgeQueueLength",
+		 "AWS_ELB_SpilloverCount"],
+    "paramArray": { "itemTitle": [ "name" ], "schemaTitle": "AWS Access Credentials" },
+    "paramSchema": [
+        {
+            "title": "Access Key ID",
+            "name": "access_key_id",
+            "description": "Access Key ID for AWS",
+            "type": "string",
+            "default": "",
+            "required": true
+        },
+        {
+            "title": "Secret Access Key",
+            "name": "secret_access_key",
+            "description": "Secret Access Key for AWS",
+            "type": "string",
+            "default": "",
+            "required": true
+        }
+    ]
+}
+
