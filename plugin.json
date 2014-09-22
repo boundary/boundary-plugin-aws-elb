@@ -15,7 +15,6 @@
 		 "AWS_ELB_BackendConnectionErrors",
 		 "AWS_ELB_SurgeQueueLength",
 		 "AWS_ELB_SpilloverCount"],
-    "paramArray": { "itemTitle": [ "name" ], "schemaTitle": "AWS Access Credentials" },
     "paramSchema": [
         {
             "title": "Access Key ID",

@@ -1,7 +1,0 @@
-AWS_ACCESS_KEY_ID = ""
-AWS_SECRET_ACCESS_KEY = ""
-
-LOG_FILE = "boundary_elb_plugin.log"
-
-POLL_INTERVAL = 60*1000
-
