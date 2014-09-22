@@ -27,17 +27,41 @@ def parse_params():
         params = json.loads(f.read())
         return params
 
+def flatten_elb_metrics(data):
+    '''
+    Converts the data returned by elb_metrics.get_elb_metrics into a flat dictionary.
+    @return A dictionary, with each key being a tuple
+        (LoadBalancerName, MetricName)
+    and the value being a tuple
+        (Timestamp, Value)
+    '''
+    out = dict()
+    for lb_name,lb_data in data.items():
+        for metric_name,metric_data in lb_data.items():
+            out[(lb_name, metric_name)] = (metric_data['Timestamp'], metric_data['Value'])
+    return out
+
 if __name__ == '__main__':
     settings = parse_params()
 
-    logging.basicConfig(level=logging.INFO, filename=settings.get('log_file', None))
+    logging.basicConfig(level=logging.ERROR, filename=settings.get('log_file', None))
 
+    reported_metrics = dict()
     while True:
         data = get_elb_metrics(settings['access_key_id'], settings['secret_access_key'])
+        flat_data = flatten_elb_metrics(data)
 
-        for lb_name,lb_data in data.items():
-            for metric_name,metric_data in lb_data.items():
-                boundary_report_stat('AWS_ELB_' + metric_name, metric_data['Value'], 'ELB_' + lb_name, metric_data['Timestamp'])
+        for k,v in flat_data.items():
+            # Do not report duplicate samples, since Boundary sums them up
+            # instead of ignoring them.
+            if reported_metrics.get(k, None) == v:
+                continue
+
+            lb_name, metric_name = k
+            metric_timestamp, metric_value = v
+
+            reported_metrics[k] = v
+            boundary_report_stat('AWS_ELB_' + metric_name, metric_value, 'ELB_' + lb_name, metric_timestamp)
 
         time.sleep(float(settings.get("pollInterval", 60*1000) / 1000))
 
