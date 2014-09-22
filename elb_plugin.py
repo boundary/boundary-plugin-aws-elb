@@ -20,7 +20,10 @@ def boundary_report_stat(stat_name, stat_value, stat_source=None, stat_timestamp
     stat_source = stat_source or HOSTNAME
     if stat_timestamp:
         stat_timestamp = unix_time_millis(stat_timestamp)
-    print "%s %s %s%s" % (stat_name, stat_value, stat_source, (' %d' % stat_timestamp) if stat_timestamp else '')
+    out = "%s %s %s%s" % (stat_name, stat_value, stat_source, (' %d' % stat_timestamp) if stat_timestamp else '')
+    print out
+    with open('reports.log', 'a') as f:
+        f.write(out + "\n")
 
 def parse_params():
     with open('param.json') as f:
