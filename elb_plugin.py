@@ -25,9 +25,7 @@ def boundary_report_stat(stat_name, stat_value, stat_source=None, stat_timestamp
 def parse_params():
     with open('param.json') as f:
         params = json.loads(f.read())
-    if len(params['items']) != 1:
-        raise "Invalid parameters"
-    return params['items'][0]
+        return params
 
 if __name__ == '__main__':
     settings = parse_params()
@@ -41,6 +39,5 @@ if __name__ == '__main__':
             for metric_name,metric_data in lb_data.items():
                 boundary_report_stat('AWS_ELB_' + metric_name, metric_data['Value'], 'ELB_' + lb_name, metric_data['Timestamp'])
 
-        print ""
         time.sleep(float(settings.get("pollInterval", 60*1000) / 1000))
 
