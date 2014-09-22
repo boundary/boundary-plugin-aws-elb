@@ -33,12 +33,12 @@ def flatten_elb_metrics(data):
     @return A dictionary, with each key being a tuple
         (LoadBalancerName, MetricName)
     and the value being a tuple
-        (Timestamp, Value)
+        (Timestamp, Value, Statistic)
     '''
     out = dict()
     for lb_name,lb_data in data.items():
         for metric_name,metric_data in lb_data.items():
-            out[(lb_name, metric_name)] = (metric_data['Timestamp'], metric_data['Value'])
+            out[(lb_name, metric_name)] = (metric_data['Timestamp'], metric_data['Value'], metric_data['Statistic'])
     return out
 
 if __name__ == '__main__':
@@ -52,19 +52,20 @@ if __name__ == '__main__':
         flat_data = flatten_elb_metrics(data)
 
         for k,v in flat_data.items():
-            # Do not report duplicate samples, since Boundary sums them up
-            # instead of ignoring them.
-            # TEMPORARY WORKAROUND: Always report the HealthyHostCount metric, because
-            # if we report nothing the relay thinks we're dead.  That specific metric
-            # doesn't hurt to report multiple times, because it's averaged out anyway.
-            if reported_metrics.get(k, None) == v and k[1] != 'HealthyHostCount':
-                continue
-
             lb_name, metric_name = k
-            metric_timestamp, metric_value = v
+            metric_timestamp, metric_value, metric_statistic = v
+
+            # Deal with duplicate samples
+            if reported_metrics.get(k, None) == v:
+                # * For summed values, duplicate statistics cause Boundary to sum the same
+                #   value twice.  In that case, just report a zero.
+                if metric_statistic in ['Sum']:
+                    metric_value = 0
+                # * For average or extremity values, duplicate statistics are a don't-care
+                else:
+                    pass
 
             reported_metrics[k] = v
             boundary_report_stat('AWS_ELB_' + metric_name, metric_value, 'ELB_' + lb_name, metric_timestamp)
 
         time.sleep(float(settings.get("pollInterval", 60*1000) / 1000))
-

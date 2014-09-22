@@ -34,8 +34,8 @@ def get_elb_metrics(access_key_id, secret_access_key):
     @return A dictionary, with keys being load balancer names and values being
         dictionaries of metrics.  In the metrics dictionary, the metric name is the
         key and the value is itself a dictionary, as follows:
-        {'LoadBalancerName': {'Metric1': {'Timestamp': datetime_object, 'Value': metric_value}},
-                             {'Metric2': {'Timestamp': datetime_object, 'Value': metric_value}},
+        {'LoadBalancerName': {'Metric1': {'Timestamp': datetime_object, 'Value': metric_value, 'Statistic': statistic}},
+                             {'Metric2': {'Timestamp': datetime_object, 'Value': metric_value, 'Statistic': statistic}},
         }
     '''
     logger = logging.getLogger('get_elb_metrics')
@@ -75,7 +75,7 @@ def get_elb_metrics(access_key_id, secret_access_key):
             sample = max(data, key=lambda d: d['Timestamp'])
             
             logger.info("\t\tELB Value: %s: %s" % (sample['Timestamp'], sample[metric_statistic]))
-            out_lb[metric_name] = {'Timestamp': sample['Timestamp'], 'Value': sample[metric_statistic]}
+            out_lb[metric_name] = {'Timestamp': sample['Timestamp'], 'Value': sample[metric_statistic], 'Statistic': metric_statistic}
 
         out[lb.name] = out_lb
 
