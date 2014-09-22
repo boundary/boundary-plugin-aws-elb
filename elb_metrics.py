@@ -85,10 +85,11 @@ def get_elb_metrics(access_key_id, secret_access_key):
 # print it nicely.
 if __name__ == '__main__':
     import pprint
-    import settings
+    from elb_plugin import parse_params
 
     logging.basicConfig(level=logging.INFO)
+    settings = parse_params()
 
-    data = get_elb_metrics(settings.AWS_ACCESS_KEY_ID, settings.AWS_SECRET_ACCESS_KEY)
+    data = get_elb_metrics(settings['access_key_id'], settings['secret_access_key'])
     pprint.pprint(data)
 
