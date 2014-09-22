@@ -42,5 +42,5 @@ if __name__ == '__main__':
                 boundary_report_stat('AWS_ELB_' + metric_name, metric_data['Value'], 'ELB_' + lb_name, metric_data['Timestamp'])
 
         print ""
-        time.sleep(float(settings.get("pollInterval", 60*1000) / 1000)
+        time.sleep(float(settings.get("pollInterval", 60*1000) / 1000))
 
