@@ -15,6 +15,10 @@
 		 "AWS_ELB_BackendConnectionErrors",
 		 "AWS_ELB_SurgeQueueLength",
 		 "AWS_ELB_SpilloverCount"],
+
+    "dashboards" : [{"name" : "ELB",
+        "layout" : "d-w=2&d-h=2&d-pad=5&d-bg=none&d-g-AWS_ELB_REQUESTCOUNT=1-0-1-1&d-g-AWS_ELB_LATENCY=1-1-1-1&d-g-AWS_ELB_UNHEALTHYHOSTCOUNT=0-1-1-1&d-g-AWS_ELB_HEALTHYHOSTCOUNT=0-0-1-1"}],
+
     "paramSchema": [
         {
             "title": "Access Key ID",
