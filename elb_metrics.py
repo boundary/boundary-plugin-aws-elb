@@ -26,16 +26,25 @@ ELB_METRICS = (
     ('SpilloverCount',),
 )
 
-def get_elb_metrics(access_key_id, secret_access_key):
+def get_elb_metrics(access_key_id, secret_access_key, only_latest=True, start_time=None, end_time=None):
     '''
     Retrieves latest values for all AWS ELB metrics.
     @param access_key_id AWS Access Key ID.
     @param secret_access_key AWS Secret Access Key.
+    @param only_latest True to return only the single latest sample for each metric; False to return
+        all the metrics returned between start_time and end_time.
+    @param start_time The earliest metric time to retrieve (inclusive); defaults to 20 minutes before end_time.
+    @param end_time The latest metric time to retrieve (exclusive); defaults to now.
     @return A dictionary, with keys being load balancer names and values being
         dictionaries of metrics.  In the metrics dictionary, the metric name is the
         key and the value is itself a dictionary, as follows:
         {'LoadBalancerName': {'Metric1': {'Timestamp': datetime_object, 'Value': metric_value, 'Statistic': statistic}},
                              {'Metric2': {'Timestamp': datetime_object, 'Value': metric_value, 'Statistic': statistic}},
+        }
+        If only_latest is False, the value of the metric dictionary will be a list of dictionaries instead of a single one,
+        as follows:
+        {'LoadBalancerName': {'Metric1': [{'Timestamp': datetime_object, 'Value': metric_value, 'Statistic': statistic}, ...]},
+                             {'Metric2': [{'Timestamp': datetime_object, 'Value': metric_value, 'Statistic': statistic}, ...]},
         }
     @note AWS reports metrics in either 60-second or 5-minute intervals, depending on monitoring service level and metric.
         This function will return the latest datapoint for each metric, but keep in mind that datapoint may be up to 5
@@ -55,8 +64,8 @@ def get_elb_metrics(access_key_id, secret_access_key):
     # periods, depending on service level and metric.  Instead, query the last 20 minutes, and take
     # the latest period we can get.
     period = 60
-    end_time = datetime.datetime.utcnow()
-    start_time = end_time - datetime.timedelta(minutes=20)
+    end_time = end_time or datetime.datetime.utcnow()
+    start_time = start_time or (end_time - datetime.timedelta(minutes=20))
 
     load_balancers = elb.get_all_load_balancers()
     for lb in load_balancers:
@@ -76,11 +85,20 @@ def get_elb_metrics(access_key_id, secret_access_key):
                 logger.info("\t\tNo data")
                 continue
 
-            # Pick out the latest sample
-            sample = max(data, key=lambda d: d['Timestamp'])
-            
-            logger.info("\t\tELB Value: %s: %s" % (sample['Timestamp'], sample[metric_statistic]))
-            out_lb[metric_name] = {'Timestamp': sample['Timestamp'], 'Value': sample[metric_statistic], 'Statistic': metric_statistic}
+            if only_latest:
+                # Pick out the latest sample
+                sample = max(data, key=lambda d: d['Timestamp'])
+                
+                logger.info("\t\tELB Value: %s: %s" % (sample['Timestamp'], sample[metric_statistic]))
+                out_lb[metric_name] = {'Timestamp': sample['Timestamp'], 'Value': sample[metric_statistic], 'Statistic': metric_statistic}
+            else:
+                # Output all retrieved samples as a list, sorted by timestamp
+                data = sorted(data, key=lambda d: d['Timestamp'])
+                out_metric = []
+                for sample in data:
+                    logger.info("\t\tELB Value: %s: %s" % (sample['Timestamp'], sample[metric_statistic]))
+                    out_metric.append({'Timestamp': sample['Timestamp'], 'Value': sample[metric_statistic], 'Statistic': metric_statistic})
+                out_lb[metric_name] = out_metric
 
         out[lb.name] = out_lb
 
