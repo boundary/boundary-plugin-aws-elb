@@ -49,6 +49,7 @@ def boundary_report_metric(name, value, source=None, timestamp=None):
         with open(metric_log_file, 'a') as f:
             f.write(out + "\n")
 
+    global reported_anything
     reported_anything = True
 
 def report_alive():
@@ -78,8 +79,9 @@ def sleep_interval(alive_workaround=True):
     @param alive_workaround Whether to enable the temporary anti-timeout workaround
         detailed above.
     '''
+    global reported_anything
+
     if alive_workaround:
-        global reported_anything
         if not reported_anything:
             report_alive()
 

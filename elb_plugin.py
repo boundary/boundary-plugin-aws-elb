@@ -6,6 +6,7 @@ import json
 
 from elb_metrics import get_elb_metrics
 import boundary_plugin
+import status_store
 
 '''
 If getting statistics from CloudWatch fails, we will retry up to this number of times before
@@ -53,10 +54,11 @@ def flatten_elb_metrics(data):
 
 if __name__ == '__main__':
     settings = boundary_plugin.parse_params()
+    reported_metrics = status_store.load_status_store() or dict()
 
     logging.basicConfig(level=logging.ERROR, filename=settings.get('log_file', None))
+    boundary_plugin.log_metrics_to_file("reports.log")
 
-    reported_metrics = dict()
     while True:
         data = get_elb_metrics_with_retries(settings['access_key_id'], settings['secret_access_key'])
         flat_data = flatten_elb_metrics(data)
@@ -73,5 +75,6 @@ if __name__ == '__main__':
             reported_metrics[k] = v
             boundary_plugin.boundary_report_metric('AWS_ELB_' + metric_name, metric_value, 'ELB_' + lb_name, metric_timestamp)
 
+        status_store.save_status_store(reported_metrics)
         boundary_plugin.sleep_interval()
 
