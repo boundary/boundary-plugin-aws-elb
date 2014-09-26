@@ -5,30 +5,37 @@ import socket
 import json
 
 from elb_metrics import get_elb_metrics
+import boundary_plugin
 
-HOSTNAME = socket.gethostname()
+'''
+If getting statistics from CloudWatch fails, we will retry up to this number of times before
+giving up and aborting the plugin.  Use 0 for unlimited retries.
+WARNING: Due to a Boundary Relay 
+'''
+PLUGIN_RETRY_COUNT = 0
+'''
+If getting statistics from CloudWatch fails, we will wait this long (in seconds) before retrying.
+This value must not be greater than 30 seconds, because the Boundary Relay will think we've
+timed out and terminate us after 30 seconds of inactivity.
+'''
+PLUGIN_RETRY_DELAY = 5
 
-def unix_time(dt):
-    epoch = datetime.datetime.utcfromtimestamp(0)
-    delta = dt - epoch
-    return delta.days * 86400 + delta.seconds + delta.microseconds / 1e6
+def get_elb_metrics_with_retries(*args, **kwargs):
+    '''
+    Calls the get_elb_metrics function, taking into account retry configuration.
+    '''
+    retry_range = xrange(PLUGIN_RETRY_COUNT) if PLUGIN_RETRY_COUNT > 0 else iter(int, 1)
+    for _ in retry_range:
+        try:
+            return get_elb_metrics(*args, **kwargs)
+        except Exception as e:
+            logging.error("Error retrieving CloudWatch data: %s" % e)
+            boundary_plugin.report_alive()
+            time.sleep(PLUGIN_RETRY_DELAY)
+            boundary_plugin.report_alive()
 
-def unix_time_millis(dt):
-    return unix_time(dt) * 1000.0
-
-def boundary_report_stat(stat_name, stat_value, stat_source=None, stat_timestamp=None):
-    stat_source = stat_source or HOSTNAME
-    if stat_timestamp:
-        stat_timestamp = unix_time_millis(stat_timestamp)
-    out = "%s %s %s%s" % (stat_name, stat_value, stat_source, (' %d' % stat_timestamp) if stat_timestamp else '')
-    print out
-    with open('reports.log', 'a') as f:
-        f.write(out + "\n")
-
-def parse_params():
-    with open('param.json') as f:
-        params = json.loads(f.read())
-        return params
+    logging.fatal("Max retries exceeded retrieving CloudWatch data")
+    raise Exception("Max retries exceeded retrieving CloudWatch data")
 
 def flatten_elb_metrics(data):
     '''
@@ -45,29 +52,26 @@ def flatten_elb_metrics(data):
     return out
 
 if __name__ == '__main__':
-    settings = parse_params()
+    settings = boundary_plugin.parse_params()
 
     logging.basicConfig(level=logging.ERROR, filename=settings.get('log_file', None))
 
     reported_metrics = dict()
     while True:
-        data = get_elb_metrics(settings['access_key_id'], settings['secret_access_key'])
+        data = get_elb_metrics_with_retries(settings['access_key_id'], settings['secret_access_key'])
         flat_data = flatten_elb_metrics(data)
 
         for k,v in flat_data.items():
             # Do not report duplicate samples, since Boundary sums them up
             # instead of ignoring them.
-            # TEMPORARY WORKAROUND: Always report the HealthyHostCount metric, because
-            # if we report nothing the relay thinks we're dead.  That specific metric
-            # doesn't hurt to report multiple times, because it's averaged out anyway.
-            if reported_metrics.get(k, None) == v and k[1] != 'HealthyHostCount':
+            if reported_metrics.get(k, None) == v:
                 continue
 
             lb_name, metric_name = k
             metric_timestamp, metric_value = v
 
             reported_metrics[k] = v
-            boundary_report_stat('AWS_ELB_' + metric_name, metric_value, 'ELB_' + lb_name, metric_timestamp)
+            boundary_plugin.boundary_report_metric('AWS_ELB_' + metric_name, metric_value, 'ELB_' + lb_name, metric_timestamp)
 
-        time.sleep(float(settings.get("pollInterval", 60*1000) / 1000))
+        boundary_plugin.sleep_interval()
 
