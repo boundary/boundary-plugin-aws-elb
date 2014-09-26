@@ -38,19 +38,24 @@ def get_elb_metrics_with_retries(*args, **kwargs):
     logging.fatal("Max retries exceeded retrieving CloudWatch data")
     raise Exception("Max retries exceeded retrieving CloudWatch data")
 
-def flatten_elb_metrics(data):
-    '''
-    Converts the data returned by elb_metrics.get_elb_metrics into a flat dictionary.
-    @return A dictionary, with each key being a tuple
-        (LoadBalancerName, MetricName)
-    and the value being a tuple
-        (Timestamp, Value)
-    '''
-    out = dict()
-    for lb_name,lb_data in data.items():
-        for metric_name,metric_data in lb_data.items():
-            out[(lb_name, metric_name)] = (metric_data['Timestamp'], metric_data['Value'])
-    return out
+def handle_elb_metrics(data, reported_metrics):
+    # Data format:
+    # (RegionId, LoadBalancerName, MetricName) -> [(Timestamp, Value, Statistic), (Timestamp, Value, Statistic), ...]
+    for metric_key, metric_list in data.items():
+        region_id, load_balancer_name, metric_name = metric_key
+
+        for metric_list_item in metric_list:
+            # Do not report duplicate or past samples (note: we are comparing tuples here, which
+            # amounts to comparing their timestamps).
+            if reported_metrics.get(metric_key, None) >= metric_list_item:
+                continue
+
+            metric_timestamp, metric_value, metric_statistic = metric_list_item
+
+            boundary_plugin.boundary_report_metric('AWS_ELB_' + metric_name, metric_value, 'ELB_' + load_balancer_name, metric_timestamp)
+            reported_metrics[metric_key] = metric_list_item
+
+    status_store.save_status_store(reported_metrics)
 
 if __name__ == '__main__':
     settings = boundary_plugin.parse_params()
@@ -59,22 +64,23 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.ERROR, filename=settings.get('log_file', None))
     boundary_plugin.log_metrics_to_file("reports.log")
 
+    # Bring us up to date!  Get all data since the last time we know we reported valid data
+    # (minus 20 minutes as a buffer), and report it now, so that we report data on any time
+    # this plugin was down for any reason.
+    try:
+        earliest_timestamp = max(reported_metrics.values(), key=lambda v: v[0])[0] - datetime.timedelta(minutes=20)
+    except ValueError:
+        # Probably first run or someone deleted our status store file - just start from now
+        logging.error("No status store data; starting data collection from now")
+        pass
+    else:
+        logging.error("Starting historical data collection from %s" % earliest_timestamp)
+        data = get_elb_metrics_with_retries(settings['access_key_id'], settings['secret_access_key'], only_latest=False, start_time=earliest_timestamp, end_time=datetime.datetime.now())
+        handle_elb_metrics(data, reported_metrics)
+        logging.error("Historical data collection complete")
+
     while True:
         data = get_elb_metrics_with_retries(settings['access_key_id'], settings['secret_access_key'])
-        flat_data = flatten_elb_metrics(data)
-
-        for k,v in flat_data.items():
-            # Do not report duplicate samples, since Boundary sums them up
-            # instead of ignoring them.
-            if reported_metrics.get(k, None) == v:
-                continue
-
-            lb_name, metric_name = k
-            metric_timestamp, metric_value = v
-
-            reported_metrics[k] = v
-            boundary_plugin.boundary_report_metric('AWS_ELB_' + metric_name, metric_value, 'ELB_' + lb_name, metric_timestamp)
-
-        status_store.save_status_store(reported_metrics)
+        handle_elb_metrics(data, reported_metrics)
         boundary_plugin.sleep_interval()
 
