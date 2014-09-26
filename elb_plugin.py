@@ -11,7 +11,6 @@ import status_store
 '''
 If getting statistics from CloudWatch fails, we will retry up to this number of times before
 giving up and aborting the plugin.  Use 0 for unlimited retries.
-WARNING: Due to a Boundary Relay 
 '''
 PLUGIN_RETRY_COUNT = 0
 '''
@@ -75,7 +74,7 @@ if __name__ == '__main__':
         pass
     else:
         logging.error("Starting historical data collection from %s" % earliest_timestamp)
-        data = get_elb_metrics_with_retries(settings['access_key_id'], settings['secret_access_key'], only_latest=False, start_time=earliest_timestamp, end_time=datetime.datetime.now())
+        data = get_elb_metrics_with_retries(settings['access_key_id'], settings['secret_access_key'], only_latest=False, start_time=earliest_timestamp, end_time=datetime.datetime.utcnow())
         handle_elb_metrics(data, reported_metrics)
         logging.error("Historical data collection complete")
 

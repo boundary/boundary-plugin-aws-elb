@@ -19,6 +19,7 @@ def log_metrics_to_file(filename):
     Logs all reported metrics to a file for debugging purposes.
     @param filename File name to log to; specify None to disable logging.
     '''
+    global metric_log_file
     metric_log_file = filename
 
 def unix_time(dt):

@@ -64,6 +64,9 @@ def get_elb_metrics(access_key_id, secret_access_key, only_latest=True, start_ti
     out = dict()
     for region in boto.ec2.elb.regions():
         logger.info("Region: %s", region.name)
+        # Some regions are returned that actually do not support EC2.  Skip those.
+        if region.name in ['cn-north-1', 'us-gov-west-1']:
+            continue
         elb = boto.connect_elb(access_key_id, secret_access_key, region=region)
 
         load_balancers = elb.get_all_load_balancers()
