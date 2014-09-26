@@ -1,6 +1,6 @@
 {
     "description": "Monitors AWS Elastic Load Balancers",
-    "command": "python -u /root/boundary-plugin-aws-elb-python/elb_plugin.py",
+    "command": "python -u elb_plugin.py",
     "metrics" : [
 		 "AWS_ELB_HealthyHostCount",
 		 "AWS_ELB_UnHealthyHostCount",
