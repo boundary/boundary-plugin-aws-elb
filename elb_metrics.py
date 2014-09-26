@@ -37,6 +37,11 @@ def get_elb_metrics(access_key_id, secret_access_key):
         {'LoadBalancerName': {'Metric1': {'Timestamp': datetime_object, 'Value': metric_value, 'Statistic': statistic}},
                              {'Metric2': {'Timestamp': datetime_object, 'Value': metric_value, 'Statistic': statistic}},
         }
+    @note AWS reports metrics in either 60-second or 5-minute intervals, depending on monitoring service level and metric.
+        This function will return the latest datapoint for each metric, but keep in mind that datapoint may be up to 5
+        minutes in the past.
+    @note The Timestamp value will be for the *beginning* of each period.  For example, for a period of 60 seconds, a metric
+        returned with a timestamp of 11:23 will be for the period of [11:23, 11:24); or the period of 11:23:00 through 11:23:59.999.
     '''
     logger = logging.getLogger('get_elb_metrics')
     # TBD: May need to iterate regions?
