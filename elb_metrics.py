@@ -2,29 +2,33 @@ import boto
 import boto.ec2.elb
 import datetime
 import logging
+from boto.ec2.cloudwatch import CloudWatchConnection
+from boto.ec2 import RegionInfo
 
 __all__ = ['get_elb_metrics']
 
 '''
 List of all ELB metrics we will collect.  Each tuple in the list should have the form
-    (metric_name, [statistic])
-where metric_name is the AWS metric name, and statistic is the statistic to collect (defaults to 'Sum'
-if not provided).
+    (metric_name, statistic, metric_name_id)
+where
+  metric_name is the AWS metric name
+  statistic is the statistic to collect
+  metric_name_id is the metric identifier in Boundary
 '''
 ELB_METRICS = (
-    ('HealthyHostCount', 'Average'),
-    ('UnHealthyHostCount', 'Average'),
-    ('RequestCount',),
-    ('Latency', 'Average'),
-    ('HTTPCode_ELB_4XX',),
-    ('HTTPCode_ELB_5XX',),
-    ('HTTPCode_Backend_2XX',),
-    ('HTTPCode_Backend_3XX',),
-    ('HTTPCode_Backend_4XX',),
-    ('HTTPCode_Backend_5XX',),
-    ('BackendConnectionErrors',),
-    ('SurgeQueueLength', 'Maximum'),
-    ('SpilloverCount',),
+    ('HealthyHostCount', 'Average','AWS_ELB_HEALTHY_HOST_COUNT'),
+    ('UnHealthyHostCount', 'Average','AWS_ELB_UNHEALTHY_HOST_COUNT'),
+    ('RequestCount','Sum','AWS_ELB_REQUEST_COUNT'),
+    ('Latency', 'Average','AWS_ELB_LATENCY'),
+    ('HTTPCode_ELB_4XX','Sum','AWS_ELB_HTTP_CODE_4XX'),
+    ('HTTPCode_ELB_5XX','Sum','AWS_ELB_HTTP_CODE_5XX'),
+    ('HTTPCode_Backend_2XX','Sum','AWS_ELB_HTTP_CODE_BACKEND_2XX'),
+    ('HTTPCode_Backend_3XX','Sum','AWS_ELB_HTTP_CODE_BACKEND_3XX'),
+    ('HTTPCode_Backend_4XX','Sum','AWS_ELB_HTTP_CODE_BACKEND_4XX'),
+    ('HTTPCode_Backend_5XX','Sum','AWS_ELB_HTTP_CODE_BACKEND_5XX'),
+    ('BackendConnectionErrors','Sum','AWS_ELB_BACKEND_CONNECTION_ERRORS'),
+    ('SurgeQueueLength', 'Maximum','AWS_ELB_SURGE_QUEUE_LENGTH'),
+    ('SpilloverCount','Sum','AWS_ELB_SPILLOVER_COUNT'),
 )
 
 def get_elb_metrics(access_key_id, secret_access_key, only_latest=True, start_time=None, end_time=None):
@@ -59,8 +63,6 @@ def get_elb_metrics(access_key_id, secret_access_key, only_latest=True, start_ti
     end_time = end_time or datetime.datetime.utcnow()
     start_time = start_time or (end_time - datetime.timedelta(minutes=20))
 
-    cw = boto.connect_cloudwatch(access_key_id, secret_access_key)
-
     out = dict()
     for region in boto.ec2.elb.regions():
         logger.info("Region: %s", region.name)
@@ -68,16 +70,23 @@ def get_elb_metrics(access_key_id, secret_access_key, only_latest=True, start_ti
         if region.name in ['cn-north-1', 'us-gov-west-1']:
             continue
         elb = boto.connect_elb(access_key_id, secret_access_key, region=region)
+        cloud_watch = boto.connect_cloudwatch(access_key_id, secret_access_key,region=region)
 
         load_balancers = elb.get_all_load_balancers()
         for lb in load_balancers:
             logger.info("\tELB: %s" % lb.name)
 
             for metric in ELB_METRICS:
+                # AWS ELB Metric Name
                 metric_name = metric[0]
-                metric_statistic = metric[1] if len(metric) > 1 else 'Sum'
-                logger.info("\t\tELB Metric: %s %s" % (metric_name, metric_statistic))
+                # AWS Statistic
+                metric_statistic = metric[1]
+                # Boundary metric identifier
+                metric_name_id = metric[2]
+                logger.info("\t\tELB Metric: %s %s %s" % (metric_name, metric_statistic, metric_name_id))
                 
+                region = RegionInfo(name=region.name,endpoint="monitoring." + region.name + ".amazonaws.com")
+                cw = boto.connect_cloudwatch(access_key_id, secret_access_key,region=region)
                 data = cw.get_metric_statistics(period=period, start_time=start_time, end_time=end_time,
                                                 metric_name=metric_name, namespace='AWS/ELB',
                                                 statistics=metric_statistic,
@@ -96,7 +105,7 @@ def get_elb_metrics(access_key_id, secret_access_key, only_latest=True, start_ti
                 out_metric = []
                 for sample in data:
                     logger.info("\t\t\tELB Value: %s: %s" % (sample['Timestamp'], sample[metric_statistic]))
-                    out_metric.append((sample['Timestamp'], sample[metric_statistic], metric_statistic))
+                    out_metric.append((sample['Timestamp'], sample[metric_statistic], metric_statistic, metric_name_id))
                 out[(region.name, lb.name, metric_name)] = out_metric
 
     return out
@@ -107,9 +116,9 @@ if __name__ == '__main__':
     import pprint
     from boundary_plugin import parse_params
 
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.ERROR)
     settings = parse_params()
 
-    data = get_elb_metrics(settings['access_key_id'], settings['secret_access_key'])
+    data = get_elb_metrics(settings['access_key_id'], settings['secret_key'])
     pprint.pprint(data)
 
