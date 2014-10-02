@@ -90,6 +90,19 @@ class CloudwatchMetrics(object):
         end_time = end_time or datetime.datetime.utcnow()
         start_time = start_time or (end_time - datetime.timedelta(minutes=20))
 
+        # CloudWatch can return a maximum of 1,440 datapoints in a single call.  With a period of 60 seconds, that
+        # works out to 1,440 minutes = 24 hours.  If we need more than 24 hours of data, split into a number of
+        # calls.  To prevent off-by-one issues, use 23 hours as the maximum time.
+        time_ranges = []
+        while end_time - start_time > datetime.timedelta(hours=23):
+            block_end = start_time + datetime.timedelta(hours=23)
+            time_ranges.append((start_time, block_end))
+            start_time = block_end
+        # Use a 30-second buffer for equality checks so we ignore things like leap seconds
+        # (the CloudWatch period is 60 seconds anyway, so any less than that doesn't matter)
+        if end_time - start_time > datetime.timedelta(seconds=30):
+            time_ranges.append((start_time, end_time))
+
         out = dict()
         for region in self.get_region_list():
             logger.info("Region: %s", region.name)
@@ -104,10 +117,13 @@ class CloudwatchMetrics(object):
                     metric_name, metric_statistic, metric_boundary_id = metric
                     logger.info("\t\tMetric: %s %s %s" % (metric_name, metric_statistic, metric_boundary_id))
                     
-                    data = cw.get_metric_statistics(period=period, start_time=start_time, end_time=end_time,
-                                                    metric_name=metric_name, namespace=self.cloudwatch_namespace,
-                                                    statistics=metric_statistic,
-                                                    dimensions=self.get_entity_dimensions(region, entity))
+                    data = []
+                    for st, et in time_ranges:
+                        data.extend(cw.get_metric_statistics(period=period, start_time=st, end_time=et,
+                                                             metric_name=metric_name, namespace=self.cloudwatch_namespace,
+                                                             statistics=metric_statistic,
+                                                             dimensions=self.get_entity_dimensions(region, entity)))
+
                     if not data:
                         logger.info("\t\t\tNo data")
                         continue
@@ -126,4 +142,3 @@ class CloudwatchMetrics(object):
                     out[(region.name, getattr(entity, 'name', str(entity)), metric_boundary_id)] = out_metric
 
         return out
-
