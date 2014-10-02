@@ -45,16 +45,25 @@ class CloudwatchMetrics(object):
         '''
         raise NotImplementedError()
 
+    def get_entity_source_name(self, entity):
+        '''
+        Returns the source name to be reported for an entity
+        (typically, this will be the entity's name).  Override if the entities used
+        in a child class do not have a "name" property.
+        '''
+        return entity.name
+
     @abc.abstractmethod
     def get_metric_list(self):
         '''
         Returns a list of metrics to be retrieved for each entity.
         Each tuple in the list should have the form
-            (metric_name, statistic, metric_name_id)
+            (metric_name, statistic, metric_name_id, [metric_description])
         where
             metric_name is the AWS metric name (e.g. HTTPCode_ELB_4XX)
             statistic is the statistic to collect (e.g. Sum or Average)
             metric_name_id is the metric identifier in Boundary (e.g. AWS_ELB_HTTP_CODE_4XX)
+            metric_description is an optional metric description (not used by the plugin directly)
 
         Abstract method, to be implemented by child classes.
         '''
@@ -111,10 +120,10 @@ class CloudwatchMetrics(object):
 
             entities = self.get_entities_for_region(region)
             for entity in entities:
-                logger.info("\tEntity: %s" % getattr(entity, 'name', str(entity)))
+                logger.info("\tEntity: %s" % self.get_entity_source_name(entity))
 
                 for metric in self.get_metric_list():
-                    metric_name, metric_statistic, metric_boundary_id = metric
+                    metric_name, metric_statistic, metric_boundary_id = metric[:3]
                     logger.info("\t\tMetric: %s %s %s" % (metric_name, metric_statistic, metric_boundary_id))
                     
                     data = []
@@ -139,6 +148,6 @@ class CloudwatchMetrics(object):
                     for sample in data:
                         logger.info("\t\t\tValue: %s: %s" % (sample['Timestamp'], sample[metric_statistic]))
                         out_metric.append((sample['Timestamp'], sample[metric_statistic], metric_statistic))
-                    out[(region.name, getattr(entity, 'name', str(entity)), metric_boundary_id)] = out_metric
+                    out[(region.name, self.get_entity_source_name(entity), metric_boundary_id)] = out_metric
 
         return out
