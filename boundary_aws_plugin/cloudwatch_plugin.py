@@ -70,6 +70,7 @@ class CloudwatchPlugin(object):
         reports_log = settings.get('report_log_file')
         if reports_log:
             boundary_plugin.log_metrics_to_file("reports.log")
+        boundary_plugin.start_keepalive_subprocess()
 
         self.cloudwatch_metrics = self.cloudwatch_metrics_type(settings['access_key_id'], settings['secret_key'])
 

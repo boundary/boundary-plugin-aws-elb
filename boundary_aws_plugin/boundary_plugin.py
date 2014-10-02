@@ -3,16 +3,26 @@ import datetime
 import time
 import socket
 import json
+import multiprocessing
+from contextlib import contextmanager
+import sys
 
 HOSTNAME = socket.gethostname()
 
 metric_log_file = None
 plugin_params = None
+keepalive_process = None
+keepalive_lock = None
+
 '''
-Used for the anti-timeout workaround in sleep_interval.  See function documentation
-for more information.
+If the plugin doesn't generate any output for 30 seconds (hard-coded), the
+Boundary Relay thinks we're dead and kills us.  Because we may not have any
+data to output for much longer than that, we workaround this by outputting
+a bogus metric every so often.  This constant controls the delay ebtween
+bogus metrics; it should be significantly less than 30 seconds to prevent
+any timing issues.
 '''
-reported_anything = False
+KEEPALIVE_INTERVAL = 15
 
 def log_metrics_to_file(filename):
     '''
@@ -30,6 +40,13 @@ def unix_time(dt):
 def unix_time_millis(dt):
     return unix_time(dt) * 1000.0
 
+@contextmanager
+def maybe_lock(lock):
+    if lock: lock.acquire()
+    yield
+    if lock: lock.release()
+    return
+
 def boundary_report_metric(name, value, source=None, timestamp=None):
     '''
     Reports a metric to the Boundary relay.
@@ -39,24 +56,24 @@ def boundary_report_metric(name, value, source=None, timestamp=None):
     @param timestamp Timestamp of the metric as a Python datetime object.  Defaults to none
         (Boundary uses the current time in that case).
     '''
-    source = source or HOSTNAME
-    if timestamp:
-        timestamp = unix_time_millis(timestamp)
-    out = "%s %s %s%s" % (name, value, source, (' %d' % timestamp) if timestamp else '')
-    print out
+    with maybe_lock(keepalive_lock) as _:
+        source = source or HOSTNAME
+        if timestamp:
+            timestamp = unix_time_millis(timestamp)
+        out = "%s %s %s%s" % (name, value, source, (' %d' % timestamp) if timestamp else '')
+        print out
+        # Flush stdout before we release the lock so output doesn't get intermixed
+        sys.stdout.flush()
 
-    global metric_log_file
-    if metric_log_file:
-        with open(metric_log_file, 'a') as f:
-            f.write(out + "\n")
-
-    global reported_anything
-    reported_anything = True
+        global metric_log_file
+        if metric_log_file:
+            with open(metric_log_file, 'a') as f:
+                f.write(out + "\n")
 
 def report_alive():
     '''
     Reports a bogus metric just so the Boundary Relay doesn't think we're dead.
-    See function notes on sleep_interval for more information.
+    See notes on KEEPALIVE_INTERVAL for more information.
     '''
     boundary_report_metric('BOGUS_METRIC', 0)
 
@@ -70,23 +87,28 @@ def parse_params():
             plugin_params = json.loads(f.read())
     return plugin_params
 
-def sleep_interval(alive_workaround=True):
+def sleep_interval():
     '''
     Sleeps for the plugin's poll interval, as configured in the plugin's parameters.
-    TEMPORARY WORKAROUND: If no metric has been reported since the last sleep, this
-    function also reports a bogus metric just so Boundary Relay doesn't think we're
-    dead (it times out after a hard-coded 30 seconds of no output).  It looks like
-    the unknown metrics are currently ignored by the upstream API.
-    @param alive_workaround Whether to enable the temporary anti-timeout workaround
-        detailed above.
     '''
-    global reported_anything
-
-    if alive_workaround:
-        if not reported_anything:
-            report_alive()
-
     params = parse_params()
     time.sleep(float(params.get("pollInterval", 1000) / 1000))
 
-    reported_anything = False
+def __keepalive_process_main():
+    while True:
+        report_alive()
+        time.sleep(KEEPALIVE_INTERVAL)
+
+def start_keepalive_subprocess():
+    '''
+    Starts the subprocess that keeps us alive by reporting bogus metrics.
+    This function should be called only once on plugin startup.
+    See notes on KEEPALIVE_INTERVAL for more information.
+    '''
+    global keepalive_lock, keepalive_process
+
+    assert not keepalive_lock and not keepalive_process
+    keepalive_lock = multiprocessing.Lock()
+    keepalive_process = multiprocessing.Process(target=__keepalive_process_main)
+    keepalive_process.start()
+
