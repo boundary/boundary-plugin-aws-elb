@@ -67,9 +67,9 @@ class CloudwatchPlugin(object):
         reported_metrics = status_store.load_status_store(self.status_store_filename) or dict()
 
         logging.basicConfig(level=logging.ERROR, filename=settings.get('log_file', None))
-        reports_log = settings.get('report_log_file')
+        reports_log = settings.get('report_log_file', '/tmp/reports.log')
         if reports_log:
-            boundary_plugin.log_metrics_to_file("reports.log")
+            boundary_plugin.log_metrics_to_file(reports_log)
         boundary_plugin.start_keepalive_subprocess()
 
         self.cloudwatch_metrics = self.cloudwatch_metrics_type(settings['access_key_id'], settings['secret_key'])
