@@ -1,10 +1,11 @@
+from __future__ import (absolute_import, division, print_function, unicode_literals)
 import logging
 import datetime
 import time
 import abc
 
-import boundary_plugin
-import status_store
+from . import boundary_plugin
+from . import status_store
 
 '''
 If getting statistics from CloudWatch fails, we will retry up to this number of times before

@@ -1,3 +1,4 @@
+from __future__ import (absolute_import, division, print_function, unicode_literals)
 import logging
 import datetime
 import time
@@ -61,7 +62,7 @@ def boundary_report_metric(name, value, source=None, timestamp=None):
         if timestamp:
             timestamp = unix_time_millis(timestamp)
         out = "%s %s %s%s" % (name, value, source, (' %d' % timestamp) if timestamp else '')
-        print out
+        print(out)
         # Flush stdout before we release the lock so output doesn't get intermixed
         sys.stdout.flush()
 
