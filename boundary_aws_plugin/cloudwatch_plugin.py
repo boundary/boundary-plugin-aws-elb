@@ -53,7 +53,7 @@ class CloudwatchPlugin(object):
             for metric_list_item in metric_list:
                 # Do not report duplicate or past samples (note: we are comparing tuples here, which
                 # amounts to comparing their timestamps).
-                if reported_metrics.get(metric_key, None) >= metric_list_item:
+                if reported_metrics.get(metric_key, (datetime.datetime.min,)) >= metric_list_item:
                     continue
 
                 metric_timestamp, metric_value, metric_statistic = metric_list_item
