@@ -3,6 +3,8 @@ import logging
 import datetime
 import time
 import abc
+import os
+import tempfile
 
 from . import boundary_plugin
 from . import status_store
@@ -68,7 +70,7 @@ class CloudwatchPlugin(object):
         reported_metrics = status_store.load_status_store(self.status_store_filename) or dict()
 
         logging.basicConfig(level=logging.ERROR, filename=settings.get('log_file', None))
-        reports_log = settings.get('report_log_file', '/tmp/reports.log')
+        reports_log = settings.get('report_log_file', os.path.join(tempfile.gettempdir(), 'reports.log'))
         if reports_log:
             boundary_plugin.log_metrics_to_file(reports_log)
         boundary_plugin.start_keepalive_subprocess()
