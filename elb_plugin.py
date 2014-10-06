@@ -39,7 +39,7 @@ class ElbCloudwatchMetrics(CloudwatchMetrics):
 
 class ElbCloudwatchPlugin(CloudwatchPlugin):
     def __init__(self):
-        super(ElbCloudwatchPlugin, self).__init__(ElbCloudwatchMetrics, 'AWS_ELB_', 'boundary-plugin-aws-elb-python-status')
+        super(ElbCloudwatchPlugin, self).__init__(ElbCloudwatchMetrics, '', 'boundary-plugin-aws-elb-python-status')
 
 if __name__ == '__main__':
     if len(sys.argv) > 1 and sys.argv[1] == '-v':
