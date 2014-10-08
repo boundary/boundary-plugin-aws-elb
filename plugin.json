@@ -1,5 +1,5 @@
 {
-    "description": "Monitors AWS Elastic Load Balancers",
+    "description": "Awaiting Certification - Monitors AWS Elastic Load Balancers",
     "command": "python -u elb_plugin.py",
     "icon" : "icon.png",
     "metrics" : [

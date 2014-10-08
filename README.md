@@ -1,6 +1,8 @@
 Boundary AWS ELB Plugin
 =======================
 
+**Awaiting Certification**
+
 The Boundary AWS ELB plugin collects information on AWS [Elastic Load Balancers](http://aws.amazon.com/elasticloadbalancing/) using the [CloudWatch](http://aws.amazon.com/cloudwatch/) API.
 
 The plugin requires Python 2.6 or later, as well as the [Boto Python library](https://github.com/boto/boto).  [Click here](https://github.com/boto/boto#installation) for Boto installation instructions.
