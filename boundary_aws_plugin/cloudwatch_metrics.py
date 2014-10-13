@@ -1,61 +1,63 @@
+from __future__ import (absolute_import, division, print_function, unicode_literals)
 import boto
 import boto.ec2.cloudwatch
 import datetime
 import logging
 import abc
 
+
 class CloudwatchMetrics(object):
     __metaclass__ = abc.ABCMeta
 
     def __init__(self, access_key_id, secret_access_key, cloudwatch_namespace):
-        '''
+        """
         Initializes the class.
         @param access_key_id AWS Access Key ID.
         @param secret_access_key AWS Secret Access Key.
         @param cloudwatch_namespace The namespace of all metrics this class will
             request from CloudWatch, e.g. 'AWS/ELB'.
-        '''
+        """
         self.access_key_id, self.secret_access_key = access_key_id, secret_access_key
         self.cloudwatch_namespace = cloudwatch_namespace
 
     @abc.abstractmethod
     def get_region_list(self):
-        '''
+        """
         Returns a list of boto.regioninfo.RegionInfo objects for all regions this class
         will be getting metrics for.
         Abstract method, to be implemented by child classes.
-        '''
+        """
         raise NotImplementedError()
 
     @abc.abstractmethod
     def get_entities_for_region(self, region):
-        '''
+        """
         Returns a list of entities to get metrics for in a given region.
         @param region The boto.regioninfo.RegionInfo object for the region to get entities for.
         Abstract method, to be implemented by child classes.
-        '''
+        """
         raise NotImplementedError()
 
     @abc.abstractmethod
     def get_entity_dimensions(self, region, entity):
-        '''
+        """
         Returns a dictionary of dimensions needed to get metrics for a given entity (this
         will be an entity returned by get_entities_for_region).
         Abstract method, to be implemented by child classes.
-        '''
+        """
         raise NotImplementedError()
 
     def get_entity_source_name(self, entity):
-        '''
+        """
         Returns the source name to be reported for an entity
         (typically, this will be the entity's name).  Override if the entities used
         in a child class do not have a "name" property.
-        '''
+        """
         return entity.name
 
     @abc.abstractmethod
     def get_metric_list(self):
-        '''
+        """
         Returns a list of metrics to be retrieved for each entity.
         Each tuple in the list should have the form
             (metric_name, statistic, metric_name_id, [metric_description])
@@ -66,11 +68,11 @@ class CloudwatchMetrics(object):
             metric_description is an optional metric description (not used by the plugin directly)
 
         Abstract method, to be implemented by child classes.
-        '''
+        """
         raise NotImplementedError()
 
     def get_metric_data(self, only_latest=True, start_time=None, end_time=None):
-        '''
+        """
         Retrieves AWS ELB metrics from CloudWatch.
         @param only_latest True to return only the single latest sample for each metric; False to return
             all the metrics returned between start_time and end_time.
@@ -89,7 +91,7 @@ class CloudwatchMetrics(object):
             Keep in mind that even if end_time is now, the latest datapoint returned may be up to 5 minutes in the past.
         @note The Timestamp value will be for the *beginning* of each period.  For example, for a period of 60 seconds, a metric
             returned with a timestamp of 11:23 will be for the period of [11:23, 11:24); or the period of 11:23:00 through 11:23:59.999.
-        '''
+        """
         logger = logging.getLogger('CloudwatchMetrics')
 
         # Note: although we want a 60-second period, not all CloudWatch metrics are provided in 60-second
