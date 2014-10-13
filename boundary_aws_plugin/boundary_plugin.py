@@ -7,6 +7,7 @@ import json
 import multiprocessing
 from contextlib import contextmanager
 import sys
+import os
 
 HOSTNAME = socket.gethostname()
 
@@ -104,8 +105,12 @@ def sleep_interval():
     time.sleep(float(params.get("pollInterval", 1000) / 1000))
 
 
-def __keepalive_process_main():
-    while True:
+def __keepalive_process_main(parent_pid):
+    # Workaround: on Linux, the Boundary Relay's sends SIGTERM to kill the plugin, which kills the main process but
+    # doesn't kill the keepalive process.  We work around this by identifying that our parent has died (and
+    # accordingly, our parent is now init) and killing ourselves.
+    # Note that os.getppid() doesn't exist on Windows, hence the getattr workaround.
+    while parent_pid == getattr(os, 'getppid', lambda: parent_pid)():
         report_alive()
         time.sleep(KEEPALIVE_INTERVAL)
 
@@ -120,5 +125,5 @@ def start_keepalive_subprocess():
 
     assert not keepalive_lock and not keepalive_process
     keepalive_lock = multiprocessing.Lock()
-    keepalive_process = multiprocessing.Process(target=__keepalive_process_main)
+    keepalive_process = multiprocessing.Process(target=__keepalive_process_main, args=(os.getpid(),))
     keepalive_process.start()
